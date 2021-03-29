@@ -35,7 +35,7 @@ func (c *Log) Read(offset uint64) (Record, error) {
 	if offset >= uint64(len(c.records)) {
 		return Record{}, ErrOffsetNotFound
 	}
-ax
+
 	return c.records[offset], nil
 }
 
