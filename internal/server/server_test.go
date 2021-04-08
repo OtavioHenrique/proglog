@@ -43,6 +43,8 @@ func setupTest(t *testing.T, fn func(*Config)) (client api.LogClient, config *Co
 
 	clientTLSConfig, err := configtls.SetupTLSConfig(configtls.TLSConfig{
 		CAFile: configtls.CAFile,
+		CertFile: configtls.ClientCertFile,
+		KeyFile: configtls.ClientKeyFile,
 	})
 	require.NoError(t, err)
 
