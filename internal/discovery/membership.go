@@ -1,6 +1,7 @@
 package discovery
 
 import (
+    "github.com/hashicorp/raft"
     "github.com/hashicorp/serf/serf"
     "go.uber.org/zap"
     "net"
@@ -116,14 +117,23 @@ func (m *Membership) handleLeave(member serf.Member) {
 func (m *Membership) isLocal(member serf.Member) bool {
     return m.serf.LocalMember().Name == member.Name
 }
+
 func (m *Membership) Members() []serf.Member {
     return m.serf.Members()
 }
+
 func (m *Membership) Leave() error {
     return m.serf.Leave()
 }
+
 func (m *Membership) logError(err error, msg string, member serf.Member) {
-    m.logger.Error(
+    log := m.logger.Error
+
+    if err == raft.ErrNotLeader {
+        log = m.logger.Debug
+    }
+
+    log(
         msg,
         zap.Error(err),
         zap.String("name", member.Name),

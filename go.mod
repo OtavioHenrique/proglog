@@ -7,6 +7,8 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
+	github.com/hashicorp/raft v1.1.1
+	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea
 	github.com/hashicorp/serf v0.8.5
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/stretchr/testify v1.7.0
@@ -28,3 +30,5 @@ require (
 )
 
 replace github.com/coreos/bbolt => go.etcd.io/bbolt v1.3.5
+
+replace github.com/hashicorp/raft-boltdb => github.com/travisjeffery/raft-boltdb v1.0.0

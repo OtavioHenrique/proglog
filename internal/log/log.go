@@ -2,6 +2,7 @@ package log
 
 import (
 	api "github.com/otaviohenrique/proglog/api/v1"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -54,8 +55,7 @@ func NewLog(dir string, c Config) (*Log, error) {
 		if err = l.newSegment(baseOffsets[i]); err != nil {
 			return nil, err
 		}
-		// baseOffset contains dup for index and store so we skip
-		// the dup
+
 		i++
 	}
 	if l.segments == nil {
@@ -105,6 +105,7 @@ func (l *Log) Close() error {
 	}
 	return nil
 }
+
 func (l *Log) Remove() error {
 	if err := l.Close(); err != nil {
 		return err
@@ -112,6 +113,7 @@ func (l *Log) Remove() error {
 
 	return os.RemoveAll(l.Dir)
 }
+
 func (l *Log) Reset() error {
 	if err := l.Remove(); err != nil {
 		return err
@@ -128,15 +130,19 @@ func (l *Log) Reset() error {
 func (l *Log) LowestOffset() (uint64, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+
 	return l.segments[0].baseOffset, nil
 }
+
 func (l *Log) HighestOffset() (uint64, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	off := l.segments[len(l.segments)-1].nextOffset
+
 	if off == 0 {
 		return 0, nil
 	}
+
 	return off - 1, nil
 }
 
@@ -144,6 +150,7 @@ func (l *Log) Truncate(lowest uint64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	var segments []*segment
+
 	for _, s := range l.segments {
 		if s.nextOffset <= lowest+1 {
 			if err := s.Remove(); err != nil {
@@ -153,16 +160,38 @@ func (l *Log) Truncate(lowest uint64) error {
 		}
 		segments = append(segments, s)
 	}
+
 	l.segments = segments
+
 	return nil
 }
 
 func (l *Log) newSegment(off uint64) error {
 	s, err := newSegment(l.Dir, off, l.Config)
+
 	if err != nil {
 		return err
 	}
+
 	l.segments = append(l.segments, s)
 	l.activeSegment = s
+
 	return nil
+}
+
+func (l *Log) Reader() io.Reader {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	readers := make([]io.Reader, len(l.segments))
+
+	for i, segment := range l.segments {
+		readers[i] = &originReader{segment.store, 0}
+	}
+
+	return io.MultiReader(readers...)
+}
+
+type originReader struct {
+	*store
+	off int64
 }
