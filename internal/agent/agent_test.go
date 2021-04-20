@@ -7,6 +7,7 @@ import (
     api "github.com/otaviohenrique/proglog/api/v1"
     "github.com/otaviohenrique/proglog/internal/agent"
     "github.com/otaviohenrique/proglog/internal/config"
+    "github.com/otaviohenrique/proglog/internal/loadbalance"
     "github.com/stretchr/testify/require"
     "github.com/travisjeffery/go-dynaport"
     "google.golang.org/grpc"
@@ -57,6 +58,7 @@ func TestAgent(t *testing.T) {
         }
 
         agent, err := agent.New(agent.Config{
+            Bootstrap: i == 0,
             NodeName: fmt.Sprintf("%d", i),
             StartJoinAddrs: startJoinAddrs,
             BindAddr: bindAddr,
@@ -93,6 +95,8 @@ func TestAgent(t *testing.T) {
         },
     )
 
+    time.Sleep(3 * time.Second)
+
     require.NoError(t, err)
     consumeResponse, err := leaderClient.Consume(
         context.Background(),
@@ -104,7 +108,6 @@ func TestAgent(t *testing.T) {
     require.NoError(t, err)
     require.Equal(t, consumeResponse.Record.Value, []byte("foo"))
 
-    time.Sleep(3 * time.Second)
     followerClient := client(t, agents[1], peerTLSConfig)
 
     consumeResponse, err = followerClient.Consume(
@@ -116,6 +119,19 @@ func TestAgent(t *testing.T) {
 
     require.NoError(t, err)
     require.Equal(t, consumeResponse.Record.Value, []byte("foo"))
+
+    consumeResponse, err = leaderClient.Consume(
+        context.Background(),
+        &api.ConsumeRequest{
+            Offset: produceResponse.Offset + 1,
+        },
+    )
+
+    require.Nil(t, consumeResponse)
+    require.Error(t, err)
+    got := grpc.Code(err)
+    want := grpc.Code(api.ErrOffsetOutOfRange{}.GRPCStatus().Err())
+    require.Equal(t, got, want)
 }
 
 func client(t *testing.T, agent *agent.Agent, tlsConfig *tls.Config) api.LogClient {
@@ -126,7 +142,8 @@ func client(t *testing.T, agent *agent.Agent, tlsConfig *tls.Config) api.LogClie
     require.NoError(t, err)
 
     conn, err := grpc.Dial(fmt.Sprintf(
-        "%s",
+        "%s:///%s",
+        loadbalance.Name,
         rpcAddr,
     ), opts...)
 
